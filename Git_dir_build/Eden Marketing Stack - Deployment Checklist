@@ -1,0 +1,138 @@
+# Eden Marketing Stack - Deployment Checklist
+
+**Current Status:** Ready to initialize Git repository with organized structure  
+**Date:** 2025-10-23  
+**System:** Eden on Hetzner (178.156.206.220)
+
+---
+
+## ✅ PHASE 1: CURRENT STATE (COMPLETE)
+
+### System Inventory
+- [x] Mautic 6.0.6 installed at `/root/`
+- [x] 200K contacts in database (intact)
+- [x] 3/4 containers operational (web, worker, db)
+- [x] 1 container hanging (cron - SMTP validation)
+- [x] Complete backup created (519MB)
+- [x] File structure organized
+
+### Repository Structure
+- [x] `_eden restore/` - Emergency recovery files
+- [x] `Git_dir_build/` - Repository documentation
+- [x] `Knowledge_base/` - Technical documentation organized
+
+### Documentation Complete
+- [x] Emergency restore procedures documented
+- [x] FORCE_1 cascade failure analysis preserved
+- [x] SMTP troubleshooting guides created
+- [x] Cron management scripts documented
+- [x] Email templates preserved
+
+---
+
+## 🎯 PHASE 2: REPOSITORY INITIALIZATION (NEXT STEPS)
+
+### Pre-Flight Checks
+```bash
+# 1. Verify you're in correct directory
+cd /root/
+pwd  # Should show: /root
+
+# 2. Verify file structure
+ls -la
+# Should see: _eden restore/, Git_dir_build/, Knowledge_base/
+
+# 3. Verify backup exists
+ls -la /root/backups/eden_backup_20251022_231419/
+# Should show: 519MB backup with SQL dump and volumes
+```
+
+### Initialize Repository
+```bash
+# Make script executable
+chmod +x initialize_eden_repo.sh
+
+# Run initialization
+bash initialize_eden_repo.sh
+```
+
+**What This Does:**
+1. ✅ Initializes Git repository
+2. ✅ Creates comprehensive .gitignore (protects credentials)
+3. ✅ Commits all organized files with detailed history
+4. ✅ Tags baseline as v1.0-baseline
+5. ✅ Configures GitHub remote
+6. ✅ Pushes to GitHub
+
+**Expected Output:**
+- Git repository initialized in `/root/`
+- All files committed with context
+- Tag v1.0-baseline created
+- Pushed to https://github.com/j-charles-assets/eden
+
+---
+
+## 🛡️ PHASE 3: EMERGENCY PROCEDURES (SAFETY NET)
+
+### Create Emergency Restore Script
+```bash
+# Copy script to /root/
+cp "_eden restore/Eden Emergency Restore Script.md" scripts/restore_eden_emergency.sh
+
+# Make executable
+chmod +x scripts/restore_eden_emergency.sh
+
+# TEST the restore (optional but recommended)
+# This will restore to backup state - only do if you want to test
+# bash scripts/restore_eden_emergency.sh
+```
+
+### Create Automated Backup Script
+```bash
+# Copy script to /root/
+# (Script will be provided separately)
+
+# Make executable
+chmod +x scripts/backup_eden.sh
+
+# Test backup creation
+bash scripts/backup_eden.sh
+```
+
+### Verify Safety Net
+- [ ] Emergency restore script exists and is executable
+- [ ] Backup script exists and is executable
+- [ ] Test restore completes in <2 minutes
+- [ ] Backup creates timestamped archives
+
+---
+
+## 🔧 PHASE 4: FIX SMTP ISSUES (THE MAIN EVENT)
+
+**⚠️ CRITICAL:** Only proceed after Phases 1-3 are complete!
+
+### Pre-Fix Backup
+```bash
+# Create fresh backup before any changes
+cd /root/
+bash scripts/backup_eden.sh
+```
+
+### Issue #1: Authentication (No-Auth Mode)
+**Location:** `/root/docker-compose.yml`
+
+**Current:**
+```yaml
+MAILER_DSN: smtp://smtp-relay.gmail.com:587
+```
+
+**Change To:**
+```yaml
+MAILER_DSN: smtp://smtp-relay.gmail.com:587?verify_peer=0
+# Or alternative syntax that skips auth
+```
+
+**Commit:**
+```bash
+git add docker-compose.yml
+git commit -m "Fixed #1: Disabled SMTP authentication for Google IP

@@ -1,0 +1,255 @@
+#!/bin/bash
+
+################################################################################
+# Eden Automated Backup Script
+# 
+# Purpose: Create timestamped backup of entire Eden marketing stack
+# 
+# What Gets Backed Up:
+# - Database (SQL dump with all 200K contacts)
+# - Docker volumes (config, logs, data)
+# - docker-compose.yml configuration
+# - Git commit hash (for version tracking)
+# - System metadata
+#
+# USAGE: ./backup_eden.sh
+# 
+# Backups saved to: /root/backups/eden_backup_YYYYMMDD_HHMMSS/
+################################################################################
+
+set -e  # Exit on any error
+
+# Color codes for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Configuration
+PROJECT_DIR="/root"
+BACKUP_ROOT="/root/backups"
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+BACKUP_DIR="$BACKUP_ROOT/eden_backup_$TIMESTAMP"
+DB_CONTAINER="eden_db"
+DB_NAME="eden"
+DB_USER="eden"
+DB_PASS="Elem2025!"
+
+echo -e "${BLUE}╔════════════════════════════════════════════════════════╗${NC}"
+echo -e "${BLUE}║         Eden Backup Process - Starting...             ║${NC}"
+echo -e "${BLUE}╚════════════════════════════════════════════════════════╝${NC}"
+echo ""
+
+START_TIME=$(date +%s)
+
+# Create backup directory
+mkdir -p "$BACKUP_DIR"
+echo -e "${GREEN}✓${NC} Created backup directory: $BACKUP_DIR"
+echo ""
+
+# Step 1: Backup docker-compose.yml
+echo -e "${YELLOW}[1/6]${NC} Backing up docker-compose configuration..."
+if [ -f "$PROJECT_DIR/docker-compose.yml" ]; then
+    cp "$PROJECT_DIR/docker-compose.yml" "$BACKUP_DIR/docker-compose.yml"
+    echo -e "${GREEN}✓${NC} docker-compose.yml backed up"
+else
+    echo -e "${RED}❌ WARNING: docker-compose.yml not found${NC}"
+fi
+echo ""
+
+# Step 2: Backup database
+echo -e "${YELLOW}[2/6]${NC} Backing up database..."
+echo "This may take a few minutes for 200K contacts..."
+
+# Check if container is running
+if ! docker ps --format '{{.Names}}' | grep -q "^${DB_CONTAINER}$"; then
+    echo -e "${RED}❌ ERROR: Database container '$DB_CONTAINER' is not running${NC}"
+    exit 1
+fi
+
+# Create database dump
+docker exec $DB_CONTAINER mysqldump \
+    -u $DB_USER \
+    -p$DB_PASS \
+    --single-transaction \
+    --quick \
+    --lock-tables=false \
+    $DB_NAME > "$BACKUP_DIR/eden_database.sql"
+
+DB_SIZE=$(du -h "$BACKUP_DIR/eden_database.sql" | cut -f1)
+CONTACT_COUNT=$(docker exec $DB_CONTAINER mysql -u $DB_USER -p$DB_PASS $DB_NAME -se "SELECT COUNT(*) FROM leads;" 2>/dev/null || echo "Unknown")
+echo -e "${GREEN}✓${NC} Database backed up - Size: $DB_SIZE - Contacts: $CONTACT_COUNT"
+echo ""
+
+# Step 3: Backup Docker volumes
+echo -e "${YELLOW}[3/6]${NC} Backing up Docker volumes..."
+
+# Config volume
+if docker volume ls --format '{{.Name}}' | grep -q '^eden_config$'; then
+    docker run --rm -v eden_config:/source -v "$BACKUP_DIR":/dest alpine \
+        tar czf /dest/eden_config_volume.tar.gz -C /source .
+    echo -e "${GREEN}✓${NC} Config volume backed up"
+else
+    echo -e "${YELLOW}⚠${NC}  Config volume not found (may not exist yet)"
+fi
+
+# Logs volume
+if docker volume ls --format '{{.Name}}' | grep -q '^eden_logs$'; then
+    docker run --rm -v eden_logs:/source -v "$BACKUP_DIR":/dest alpine \
+        tar czf /dest/eden_logs_volume.tar.gz -C /source .
+    echo -e "${GREEN}✓${NC} Logs volume backed up"
+else
+    echo -e "${YELLOW}⚠${NC}  Logs volume not found"
+fi
+
+# Data volume
+if docker volume ls --format '{{.Name}}' | grep -q '^eden_data$'; then
+    docker run --rm -v eden_data:/source -v "$BACKUP_DIR":/dest alpine \
+        tar czf /dest/eden_data_volume.tar.gz -C /source .
+    echo -e "${GREEN}✓${NC} Data volume backed up"
+else
+    echo -e "${YELLOW}⚠${NC}  Data volume not found"
+fi
+
+# Database volume (for complete restoration)
+if docker volume ls --format '{{.Name}}' | grep -q '^eden_db$'; then
+    echo -e "${BLUE}ℹ${NC}  Skipping database volume (SQL dump is preferred for restoration)"
+fi
+
+echo ""
+
+# Step 4: Capture Git information
+echo -e "${YELLOW}[4/6]${NC} Capturing Git version information..."
+cd "$PROJECT_DIR"
+if [ -d ".git" ]; then
+    # Get current commit hash
+    GIT_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo "Not in Git repository")
+    GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "Unknown")
+    GIT_TAG=$(git describe --tags --exact-match 2>/dev/null || echo "No tag")
+    
+    # Save to metadata file
+    cat > "$BACKUP_DIR/git_info.txt" << EOF
+Git Commit: $GIT_COMMIT
+Git Branch: $GIT_BRANCH
+Git Tag: $GIT_TAG
+Backup Date: $(date)
+EOF
+    echo -e "${GREEN}✓${NC} Git info: $GIT_BRANCH @ ${GIT_COMMIT:0:8}"
+else
+    echo -e "${YELLOW}⚠${NC}  Not a Git repository"
+fi
+echo ""
+
+# Step 5: Capture system metadata
+echo -e "${YELLOW}[5/6]${NC} Capturing system metadata..."
+cat > "$BACKUP_DIR/backup_metadata.txt" << EOF
+Eden Backup Metadata
+====================
+Backup Date: $(date)
+Backup Location: $BACKUP_DIR
+Backup Size: $(du -sh "$BACKUP_DIR" | cut -f1)
+
+Container Status at Backup:
+$(docker-compose ps)
+
+Database Info:
+- Database: $DB_NAME
+- Contact Count: $CONTACT_COUNT
+- Backup Size: $DB_SIZE
+
+System Info:
+- Hostname: $(hostname)
+- Docker Version: $(docker --version)
+- Docker Compose Version: $(docker-compose --version)
+EOF
+echo -e "${GREEN}✓${NC} Metadata captured"
+echo ""
+
+# Step 6: Create backup manifest
+echo -e "${YELLOW}[6/6]${NC} Creating backup manifest..."
+cat > "$BACKUP_DIR/BACKUP_MANIFEST.txt" << EOF
+Eden Marketing Stack Backup
+===========================
+Backup ID: eden_backup_$TIMESTAMP
+Created: $(date)
+
+Contents:
+---------
+✓ eden_database.sql           - MySQL database dump ($DB_SIZE)
+✓ docker-compose.yml          - Container configuration
+✓ eden_config_volume.tar.gz   - Mautic configuration files
+✓ eden_logs_volume.tar.gz     - Application logs
+✓ eden_data_volume.tar.gz     - Uploaded media and files
+✓ git_info.txt                - Version control metadata
+✓ backup_metadata.txt         - System state at backup time
+
+Database:
+---------
+Database Name: $DB_NAME
+Contact Count: $CONTACT_COUNT
+Backup Method: mysqldump (single-transaction)
+
+Restoration:
+------------
+To restore this backup, run:
+  cd /root/
+  ./scripts/restore_eden_emergency.sh
+
+Or manually:
+  1. Copy this backup to /root/backups/
+  2. Update restore script to use this backup directory
+  3. Run restore script
+
+IMPORTANT:
+----------
+This backup contains all sensitive data including:
+- Database credentials
+- 200K contact records
+- Email configurations
+- API keys and tokens
+
+Store securely and restrict access!
+EOF
+echo -e "${GREEN}✓${NC} Backup manifest created"
+echo ""
+
+# Calculate backup size and time
+BACKUP_SIZE=$(du -sh "$BACKUP_DIR" | cut -f1)
+END_TIME=$(date +%s)
+ELAPSED=$((END_TIME - START_TIME))
+MINUTES=$((ELAPSED / 60))
+SECONDS=$((ELAPSED % 60))
+
+# Summary
+echo -e "${GREEN}╔════════════════════════════════════════════════════════╗${NC}"
+echo -e "${GREEN}║            Backup Complete! ✓                          ║${NC}"
+echo -e "${GREEN}╚════════════════════════════════════════════════════════╝${NC}"
+echo ""
+echo "Backup Details:"
+echo -e "  Location: ${BLUE}$BACKUP_DIR${NC}"
+echo -e "  Size: ${BLUE}$BACKUP_SIZE${NC}"
+echo -e "  Duration: ${BLUE}${MINUTES}m ${SECONDS}s${NC}"
+echo -e "  Contacts: ${BLUE}$CONTACT_COUNT${NC}"
+echo ""
+echo "Backup Contents:"
+echo "  ✓ Database dump"
+echo "  ✓ Docker volumes"
+echo "  ✓ Configuration files"
+echo "  ✓ Version metadata"
+echo ""
+echo "To restore this backup:"
+echo -e "  ${YELLOW}./scripts/restore_eden_emergency.sh${NC}"
+echo ""
+
+# Clean up old backups (optional - keep last 5 backups)
+echo "Backup Management:"
+BACKUP_COUNT=$(ls -1d $BACKUP_ROOT/eden_backup_* 2>/dev/null | wc -l)
+echo "  Total backups: $BACKUP_COUNT"
+
+if [ $BACKUP_COUNT -gt 5 ]; then
+    echo -e "  ${YELLOW}⚠  More than 5 backups exist${NC}"
+    echo "  Consider cleaning old backups to save space:"
+    echo "    ls -lt $BACKUP_ROOT/ | tail -n +6"
+fi
+echo ""

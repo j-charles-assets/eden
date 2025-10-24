@@ -1,0 +1,361 @@
+#!/bin/bash
+
+################################################################################
+# Eden Fresh Repository Initialization Script
+# 
+# Purpose: Initialize Git repository with proper structure matching your layout
+# 
+# This script:
+# 1. Initializes Git in /root/
+# 2. Creates .gitignore for security
+# 3. Commits existing file structure
+# 4. Tags the baseline state
+# 5. Sets up GitHub remote
+# 6. Pushes to GitHub
+#
+# USAGE: bash initialize_eden_repo.sh
+# 
+# ⚠️  Run this from /root/ directory
+# ⚠️  Ensure your files are organized in the structure below
+################################################################################
+
+set -e  # Exit on any error
+
+# Color codes
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+echo -e "${BLUE}╔════════════════════════════════════════════════════════╗${NC}"
+echo -e "${BLUE}║     Eden Repository Initialization - Fresh Start      ║${NC}"
+echo -e "${BLUE}╚════════════════════════════════════════════════════════╝${NC}"
+echo ""
+
+# Configuration
+PROJECT_DIR="$(pwd)"
+GITHUB_REPO="https://github.com/j-charles-assets/eden"
+GITHUB_USER="j-charles-assets"
+
+cd "$PROJECT_DIR"
+
+# Verify expected directory structure exists
+echo -e "${YELLOW}[1/10]${NC} Verifying directory structure..."
+MISSING_DIRS=()
+
+if [ ! -d "_eden restore" ]; then MISSING_DIRS+=("_eden restore"); fi
+if [ ! -d "Git_dir_build" ]; then MISSING_DIRS+=("Git_dir_build"); fi
+if [ ! -d "Knowledge_base" ]; then MISSING_DIRS+=("Knowledge_base"); fi
+
+if [ ${#MISSING_DIRS[@]} -gt 0 ]; then
+    echo -e "${RED}❌ ERROR: Missing directories:${NC}"
+    printf '%s\n' "${MISSING_DIRS[@]}"
+    echo ""
+    echo "Expected structure:"
+    echo "  /root/"
+    echo "  ├── _eden restore/"
+    echo "  ├── Git_dir_build/"
+    echo "  └── Knowledge_base/"
+    exit 1
+fi
+
+echo -e "${GREEN}✓${NC} Directory structure verified"
+echo ""
+
+# Step 2: Check if Git is already initialized
+echo -e "${YELLOW}[2/10]${NC} Checking existing repository..."
+if [ -d ".git" ]; then
+    echo -e "${YELLOW}⚠  Existing Git repository found${NC}"
+    echo ""
+    echo "Options:"
+    echo "  1) Keep existing repo and commit new changes"
+    echo "  2) DELETE existing repo and start completely fresh"
+    echo "  3) Cancel"
+    echo ""
+    read -p "Choose option (1/2/3): " option
+    
+    case $option in
+        1)
+            echo -e "${BLUE}ℹ${NC}  Keeping existing repository"
+            ;;
+        2)
+            echo -e "${YELLOW}⚠  Removing existing repository...${NC}"
+            rm -rf .git
+            echo -e "${GREEN}✓${NC} Existing repository removed"
+            ;;
+        3)
+            echo "Cancelled"
+            exit 0
+            ;;
+        *)
+            echo -e "${RED}❌ Invalid option${NC}"
+            exit 1
+            ;;
+    esac
+fi
+echo ""
+
+# Step 3: Initialize Git (if needed)
+echo -e "${YELLOW}[3/10]${NC} Initializing Git repository..."
+if [ ! -d ".git" ]; then
+    git init
+    git branch -M main
+    echo -e "${GREEN}✓${NC} Git initialized with 'main' branch"
+else
+    echo -e "${BLUE}ℹ${NC}  Repository already initialized"
+fi
+echo ""
+
+# Step 4: Create comprehensive .gitignore
+echo -e "${YELLOW}[4/10]${NC} Creating .gitignore..."
+cat > .gitignore << 'EOF'
+# Eden Marketing Stack - Git Ignore Rules
+# =========================================
+
+# Docker & Environment
+docker-compose.override.yml
+.env
+.env.local
+.env.*.local
+
+# Sensitive Credentials (CRITICAL - Never commit)
+**/local.php
+**/*password*
+**/*secret*
+**/*credentials*
+**/api_keys.txt
+**/.env*
+
+# Backup Files (Too large for Git)
+/backups/*
+*.sql
+*.sql.gz
+*.tar.gz
+*.zip
+/root/backups/
+
+# Docker Volumes (Managed by Docker)
+/volumes/
+/var/lib/docker/
+
+# Logs (Too verbose for version control)
+*.log
+logs/
+*.log.*
+
+# Temporary Files
+*.tmp
+*.temp
+*.cache
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# IDE & Editor Files
+.vscode/
+.idea/
+*.sublime-*
+*.code-workspace
+
+# OS Files
+.DS_Store
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Desktop.ini
+
+# Node/NPM (if used)
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# PHP
+vendor/
+composer.lock
+
+# Python (if used)
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+venv/
+ENV/
+
+# Mautic Specific
+/var/www/html/media/files/*
+/var/www/html/media/images/*
+/var/www/html/translations/*
+/var/www/html/themes/custom/*
+
+# Database dumps (backup strategy handles these)
+*.sql
+*.mysql
+*.dump
+
+# Exception: Keep essential scripts in backups
+!_eden restore/Eden Emergency Restore Script.md
+!Git_dir_build/Eden Automated Backup Script.md
+
+# Keep README and documentation
+!README.md
+!*.md
+
+# Keep configuration templates
+!*.example
+!*.template
+!*.sample
+EOF
+
+echo -e "${GREEN}✓${NC} .gitignore created"
+echo ""
+
+# Step 5: Create README if it doesn't exist
+echo -e "${YELLOW}[5/10]${NC} Checking README.md..."
+if [ ! -f "README.md" ]; then
+    echo "Creating README.md from template..."
+    cat > README.md << 'EOF'
+# Eden Marketing Stack
+
+**Mautic 6.0.6 Email Marketing System**
+
+Quick Links:
+- [Emergency Restore](_eden%20restore/Eden%20Emergency%20Restore%20Script.md)
+- [Deployment Guide](_eden%20restore/deployment-guide.md)
+- [Full Documentation](Git_dir_build/Eden%20Marketing%20Stack.md)
+
+For complete documentation, see [Git_dir_build/README.md](Git_dir_build/README.md)
+EOF
+    echo -e "${GREEN}✓${NC} README.md created"
+else
+    echo -e "${BLUE}ℹ${NC}  README.md already exists"
+fi
+echo ""
+
+# Step 6: Stage all files
+echo -e "${YELLOW}[6/10]${NC} Staging files for commit..."
+git add .
+echo -e "${GREEN}✓${NC} Files staged"
+echo ""
+
+# Show what will be committed
+echo "Files to be committed:"
+git status --short
+echo ""
+
+# Step 7: Create initial commit
+echo -e "${YELLOW}[7/10]${NC} Creating initial commit..."
+COMMIT_MSG="v1.0: Eden baseline - 200K contacts, organized structure
+
+Repository Structure:
+- _eden restore/     Emergency recovery & deployment configs
+- Git_dir_build/     Repository documentation
+- Knowledge_base/    Technical knowledge organized by component
+
+System State:
+- Mautic 6.0.6 operational
+- 200K contacts intact
+- 3/4 containers working (eden_web, eden_worker, eden_db)
+- 1 container hanging (eden_cron - SMTP validation issue)
+
+Known Issues:
+- 4 Google SMTP relay configuration mismatches documented
+- Cron container needs authentication, IPv4, TLS, and domain fixes
+
+Backup Status:
+- Complete backup at /root/backups/eden_backup_20251022_231419/
+- Emergency restore script ready
+- Recovery time: <2 minutes
+
+Documentation Complete:
+- Emergency procedures documented
+- FORCE_1 cascade failure analysis preserved
+- Chain of custody established for all configurations"
+
+git commit -m "$COMMIT_MSG"
+echo -e "${GREEN}✓${NC} Initial commit created"
+echo ""
+
+# Step 8: Tag the baseline
+echo -e "${YELLOW}[8/10]${NC} Creating version tag..."
+git tag -a v1.0-baseline -m "Eden v1.0: Working baseline with 200K contacts
+
+Status: 3/4 containers operational, cron needs SMTP fix
+Backup: /root/backups/eden_backup_20251022_231419/
+Date: $(date +%Y-%m-%d)
+
+This tag represents the last known-good state before SMTP fixes."
+
+echo -e "${GREEN}✓${NC} Tagged as v1.0-baseline"
+echo ""
+
+# Step 9: Configure Git remote
+echo -e "${YELLOW}[9/10]${NC} Configuring GitHub remote..."
+
+# Remove existing remote if it exists
+git remote remove origin 2>/dev/null || true
+
+# Add new remote
+git remote add origin "$GITHUB_REPO.git"
+echo -e "${GREEN}✓${NC} Remote configured: $GITHUB_REPO"
+echo ""
+
+# Step 10: Push to GitHub
+echo -e "${YELLOW}[10/10]${NC} Pushing to GitHub..."
+echo ""
+echo -e "${BLUE}ℹ${NC}  You may be prompted for GitHub credentials"
+echo ""
+
+# Try to push
+if git push -u origin main --tags; then
+    echo ""
+    echo -e "${GREEN}✓${NC} Successfully pushed to GitHub"
+else
+    echo ""
+    echo -e "${YELLOW}⚠  Push failed. This might be because:${NC}"
+    echo "  1. GitHub authentication needed"
+    echo "  2. Repository doesn't exist yet"
+    echo "  3. Network connection issue"
+    echo ""
+    echo "To push manually later:"
+    echo "  git push -u origin main --tags"
+fi
+echo ""
+
+# Summary
+echo -e "${GREEN}╔════════════════════════════════════════════════════════╗${NC}"
+echo -e "${GREEN}║        Repository Initialization Complete! ✓          ║${NC}"
+echo -e "${GREEN}╚════════════════════════════════════════════════════════╝${NC}"
+echo ""
+echo "Repository Details:"
+echo -e "  Location: ${BLUE}$PROJECT_DIR${NC}"
+echo -e "  Remote: ${BLUE}$GITHUB_REPO${NC}"
+echo -e "  Branch: ${BLUE}main${NC}"
+echo -e "  Tag: ${BLUE}v1.0-baseline${NC}"
+echo ""
+echo "Next Steps:"
+echo "  1. Verify repository on GitHub:"
+echo "     ${BLUE}$GITHUB_REPO${NC}"
+echo ""
+echo "  2. Before making changes:"
+echo "     ${YELLOW}bash scripts/backup_eden.sh${NC}"
+echo ""
+echo "  3. Make configuration changes:"
+echo "     - Update docker-compose.yml"
+echo "     - Test containers first"
+echo "     - Then update UI"
+echo ""
+echo "  4. Commit changes with context:"
+echo "     ${YELLOW}git add .${NC}"
+echo "     ${YELLOW}git commit -m 'Fixed: Description of change'${NC}"
+echo "     ${YELLOW}git tag v1.1-descriptive-name${NC}"
+echo "     ${YELLOW}git push origin main --tags${NC}"
+echo ""
+echo "Documentation:"
+echo "  - Main README: Git_dir_build/README.md"
+echo "  - Emergency Restore: _eden restore/Eden Emergency Restore Script.md"
+echo "  - Deployment Guide: _eden restore/deployment-guide.md"
+echo ""

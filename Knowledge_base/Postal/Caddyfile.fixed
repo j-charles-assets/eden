@@ -1,0 +1,55 @@
+{
+    email cdmx.py@gmail.com
+}
+
+newsletter.jcharlesassets.com {
+    reverse_proxy force_1_postal_app:5000 {
+        header_up Host {host}
+        header_up X-Real-IP {remote}
+    }
+    
+    encode gzip
+    
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "SAMEORIGIN"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        -Server
+    }
+    
+    log {
+        output file /var/log/caddy/postal-access.log
+        format json
+    }
+}
+
+mautic.jcharlesassets.com {
+    reverse_proxy force_1_web:80 {
+        header_up Host {host}
+        header_up X-Real-IP {remote}
+        transport http {
+            dial_timeout 10s
+            response_header_timeout 300s
+        }
+    }
+    
+    encode gzip
+    
+    request_body {
+        max_size 100MB
+    }
+    
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "SAMEORIGIN"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        -Server
+    }
+    
+    log {
+        output file /var/log/caddy/mautic-access.log
+        format json
+    }
+}

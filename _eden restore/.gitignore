@@ -1,0 +1,7 @@
+# Eden Marketing Stack - Essential Files Only
+# Everything else is excluded
+
+*
+!README.md
+!.gitignore  
+!eden_mautic_complete.yml

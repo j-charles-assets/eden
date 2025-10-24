@@ -1,0 +1,210 @@
+version: '3.8'
+
+services:
+  eden_web:
+    image: mautic/mautic:6-apache
+    container_name: eden_web
+    hostname: mail.jcharlesassets.com
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    environment:
+      # Database Configuration
+      - MAUTIC_DB_HOST=eden_db
+      - MAUTIC_DB_PORT=3306
+      - MAUTIC_DB_NAME=eden
+      - MAUTIC_DB_USER=eden
+      - MAUTIC_DB_PASSWORD=Elem2025!
+
+      # Redis Configuration
+      - MAUTIC_REDIS_HOST=eden_redis
+      - MAUTIC_REDIS_PORT=6379
+      - MAUTIC_REDIS_PASSWORD=Elem2025!
+      - MAUTIC_CACHE_BACKEND=redis
+
+      # Transport Configuration (Database is more stable than Redis)
+      - MAUTIC_MESSENGER_TRANSPORT_DSN=doctrine://default
+
+      # Application Role
+      - DOCKER_MAUTIC_ROLE=mautic_web
+
+      # Security Configuration
+      - MAUTIC_TRUSTED_PROXIES=["0.0.0.0/0"]
+      - MAUTIC_TRUSTED_HOSTS=["178.156.206.220","mautic.jcharlesassets.com"]
+
+      # Performance Configuration
+      - PHP_MEMORY_LIMIT=2G
+      - PHP_MAX_EXECUTION_TIME=3600
+
+      # Application Configuration
+      - MAUTIC_URL=https://mautic.jcharlesassets.com
+
+      # Admin User Configuration
+      - MAUTIC_ADMIN_USERNAME=jamesRogers@jcharlesassets.com
+      - MAUTIC_ADMIN_EMAIL=jamesRogers@jcharlesassets.com
+      - MAUTIC_ADMIN_PASSWORD=Elem2025!
+
+      # Email Configuration (Google SMTP Relay - IPv4 Forced)
+      - MAUTIC_MAILER_DSN=smtp://smtp-relay.gmail.com:587?encryption=tls&local_ip=0.0.0.0
+      - MAUTIC_MAILER_URL_SCHEME=smtps
+      - MAUTIC_MAILER_FROM_NAME=JCharles Assets Newsletter
+      - MAUTIC_MAILER_FROM_EMAIL=jamesrogers@jcharlesassets.com
+
+    volumes:
+      - eden_config:/var/www/html/config
+      - eden_logs:/var/www/html/var/logs
+      - eden_var:/var/www/html/var
+      - eden_files:/var/www/html/docroot/media/files
+      - eden_images:/var/www/html/docroot/media/images
+    networks:
+      - eden_net
+    depends_on:
+      eden_db:
+        condition: service_healthy
+      eden_redis:
+        condition: service_started
+
+  eden_worker:
+    image: mautic/mautic:6-apache
+    container_name: eden_worker
+    hostname: mail.jcharlesassets.com
+    restart: unless-stopped
+    environment:
+      # Database Configuration
+      - MAUTIC_DB_HOST=eden_db
+      - MAUTIC_DB_PORT=3306
+      - MAUTIC_DB_NAME=eden
+      - MAUTIC_DB_USER=eden
+      - MAUTIC_DB_PASSWORD=Elem2025!
+
+      # Redis Configuration
+      - MAUTIC_REDIS_HOST=eden_redis
+      - MAUTIC_REDIS_PORT=6379
+      - MAUTIC_REDIS_PASSWORD=Elem2025!
+      - MAUTIC_CACHE_BACKEND=redis
+
+      # Transport Configuration
+      - MAUTIC_MESSENGER_TRANSPORT_DSN=doctrine://default
+
+      # Application Role
+      - DOCKER_MAUTIC_ROLE=mautic_worker
+
+      # Worker Configuration
+      - DOCKER_MAUTIC_WORKERS_CONSUME_EMAIL=2
+      - DOCKER_MAUTIC_WORKERS_CONSUME_HIT=2
+      - DOCKER_MAUTIC_WORKERS_CONSUME_FAILED=2
+
+      # Email Configuration (Google SMTP Relay - IPv4 Forced)
+      - MAUTIC_MAILER_DSN=smtp://smtp-relay.gmail.com:587?encryption=tls&local_ip=0.0.0.0
+      - MAUTIC_MAILER_URL_SCHEME=smtps
+      - MAUTIC_MAILER_FROM_NAME=JCharles Assets Newsletter
+      - MAUTIC_MAILER_FROM_EMAIL=jamesrogers@jcharlesassets.com
+
+    volumes:
+      - eden_config:/var/www/html/config
+      - eden_logs:/var/www/html/var/logs
+      - eden_var:/var/www/html/var
+      - eden_files:/var/www/html/docroot/media/files
+      - eden_images:/var/www/html/docroot/media/images
+    networks:
+      - eden_net
+    depends_on:
+      eden_db:
+        condition: service_healthy
+      eden_redis:
+        condition: service_started
+
+  eden_cron:
+    image: mautic/mautic:6-apache
+    container_name: eden_cron
+    hostname: mail.jcharlesassets.com
+    restart: unless-stopped
+    environment:
+      # Database Configuration
+      - MAUTIC_DB_HOST=eden_db
+      - MAUTIC_DB_PORT=3306
+      - MAUTIC_DB_NAME=eden
+      - MAUTIC_DB_USER=eden
+      - MAUTIC_DB_PASSWORD=Elem2025!
+
+      # Redis Configuration
+      - MAUTIC_REDIS_HOST=eden_redis
+      - MAUTIC_REDIS_PORT=6379
+      - MAUTIC_REDIS_PASSWORD=Elem2025!
+      - MAUTIC_CACHE_BACKEND=redis
+
+      # Transport Configuration
+      - MAUTIC_MESSENGER_TRANSPORT_DSN=doctrine://default
+
+      # Application Role
+      - DOCKER_MAUTIC_ROLE=mautic_cron
+      - MAUTIC_CRON_LOCKING=1
+
+      # Email Configuration (Google SMTP Relay - IPv4 Forced)
+      - MAUTIC_MAILER_DSN=smtp://smtp-relay.gmail.com:587?encryption=tls&local_ip=0.0.0.0
+      - MAUTIC_MAILER_URL_SCHEME=smtps
+      - MAUTIC_MAILER_FROM_NAME=JCharles Assets Newsletter
+      - MAUTIC_MAILER_FROM_EMAIL=jamesrogers@jcharlesassets.com
+
+    volumes:
+      - eden_config:/var/www/html/config
+      - eden_logs:/var/www/html/var/logs
+      - eden_var:/var/www/html/var
+      - eden_files:/var/www/html/docroot/media/files
+      - eden_images:/var/www/html/docroot/media/images
+    networks:
+      - eden_net
+    depends_on:
+      eden_db:
+        condition: service_healthy
+      eden_redis:
+        condition: service_started
+
+  eden_db:
+    image: mariadb:10.11
+    container_name: eden_db
+    restart: unless-stopped
+    environment:
+      - MYSQL_ROOT_PASSWORD=Elem2025!
+      - MYSQL_DATABASE=eden
+      - MYSQL_USER=eden
+      - MYSQL_PASSWORD=Elem2025!
+    command: >
+      --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --max_allowed_packet=256M --innodb_buffer_pool_size=512M --innodb_log_file_size=128M
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "eden", "-pElem2025!" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - eden_db_data:/var/lib/mysql
+    networks:
+      - eden_net
+
+  eden_redis:
+    image: redis:7-alpine
+    container_name: eden_redis
+    restart: unless-stopped
+    command: redis-server --requirepass Elem2025! --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - eden_redis_data:/data
+    networks:
+      - eden_net
+
+volumes:
+  eden_db_data:
+  eden_redis_data:
+  eden_config:
+  eden_logs:
+  eden_var:
+  eden_files:
+  eden_images:
+
+
+networks:
+  eden_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.12.0.0/16
+          gateway: 10.12.0.1

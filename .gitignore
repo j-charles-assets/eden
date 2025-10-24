@@ -1,0 +1,98 @@
+# Eden Marketing Stack - Git Ignore Rules
+# =========================================
+
+# Docker & Environment
+docker-compose.override.yml
+.env
+.env.local
+.env.*.local
+
+# Sensitive Credentials (CRITICAL - Never commit)
+**/local.php
+**/*password*
+**/*secret*
+**/*credentials*
+**/api_keys.txt
+**/.env*
+
+# Backup Files (Too large for Git)
+/backups/*
+*.sql
+*.sql.gz
+*.tar.gz
+*.zip
+/root/backups/
+
+# Docker Volumes (Managed by Docker)
+/volumes/
+/var/lib/docker/
+
+# Logs (Too verbose for version control)
+*.log
+logs/
+*.log.*
+
+# Temporary Files
+*.tmp
+*.temp
+*.cache
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# IDE & Editor Files
+.vscode/
+.idea/
+*.sublime-*
+*.code-workspace
+
+# OS Files
+.DS_Store
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Desktop.ini
+
+# Node/NPM (if used)
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# PHP
+vendor/
+composer.lock
+
+# Python (if used)
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+venv/
+ENV/
+
+# Mautic Specific
+/var/www/html/media/files/*
+/var/www/html/media/images/*
+/var/www/html/translations/*
+/var/www/html/themes/custom/*
+
+# Database dumps (backup strategy handles these)
+*.sql
+*.mysql
+*.dump
+
+# Exception: Keep essential scripts in backups
+!_eden restore/Eden Emergency Restore Script.md
+!Git_dir_build/Eden Automated Backup Script.md
+
+# Keep README and documentation
+!README.md
+!*.md
+
+# Keep configuration templates
+!*.example
+!*.template
+!*.sample
